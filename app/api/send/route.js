@@ -1,27 +1,27 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
-import Filter from 'bad-words';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Inisialisasi Filter Kata Kasar
-const filter = new Filter();
-
-// Daftar kata kasar Bahasa Indonesia
-const kataKasarIndo = [
+// Daftar kata kasar yang ingin diblokir (Bisa kamu tambah sesuka hati)
+const KATA_KASAR = [
   'anjing', 'babi', 'monyet', 'kunyuk', 'bajingan', 'asu',
   'kontol', 'memek', 'goblok', 'tolol', 'bego', 'bangsat',
   'peler', 'itil', 'jancok', 'pantek', 'kampret', 'kntl',
-  'mmk', 'bgst', 'gblk'
+  'mmk', 'bgst', 'gblk', 'fuck', 'shit', 'bitch'
 ];
 
-filter.addWords(...kataKasarIndo);
+// Fungsi penyeleksi kata kasar
+function cekKataKasar(teks) {
+  if (!teks) return false;
+  const teksLower = teks.toLowerCase();
+  return KATA_KASAR.some((kata) => teksLower.includes(kata));
+}
 
 export async function POST(request) {
   try {
     const { emailSekolah, subjek, pesan } = await request.json();
 
-    // 1. Validasi Input Kosong
     if (!emailSekolah || !subjek || !pesan) {
       return NextResponse.json(
         { error: 'Semua field wajib diisi.' },
@@ -29,14 +29,14 @@ export async function POST(request) {
       );
     }
 
-    // 2. Filter Kata Kasar
-    const isSubjekKasar = filter.isProfane(subjek);
-    const isPesanKasar = filter.isProfane(pesan);
+    // Cek kata kasar di subjek & pesan
+    const isSubjekKasar = cekKataKasar(subjek);
+    const isPesanKasar = cekKataKasar(pesan);
 
     if (isSubjekKasar || isPesanKasar) {
       return NextResponse.json(
         { 
-          error: 'Pesan kamu mengandung kata-kata kasar / tidak sopan! Mohon gunakan bahasa yang lebih baik agar dapat diproses.' 
+          error: 'Pesan kamu mengandung kata-kata kasar / tidak sopan! Mohon gunakan bahasa yang lebih baik.' 
         },
         { status: 400 }
       );
@@ -44,7 +44,6 @@ export async function POST(request) {
 
     const senderEmail = process.env.SENDER_EMAIL || 'Laporan Anonim <onboarding@resend.dev>';
 
-    // 3. Kirim Email via Resend
     const data = await resend.emails.send({
       from: senderEmail,
       to: [emailSekolah],
@@ -60,8 +59,8 @@ export async function POST(request) {
           </blockquote>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="font-size: 11px; color: #888; line-height: 1.4;">
-            Pesan ini dikirimkan otomatis melalui platform perantara pesan anonim. Identitas pengirim dilindungi.<br/>
-            Apabila pesan ini berisi spam atau pelanggaran, silakan laporkan ke admin di <b>abuse@arex.my.id</b>.
+            Pesan ini dikirimkan otomatis melalui platform perantara pesan anonim.<br/>
+            Apabila pesan ini berisi spam/pelanggaran, silakan hubungi admin di <b>abuse@arex.my.id</b>.
           </p>
         </div>
       `,
